@@ -1,0 +1,10 @@
+[project]
+name = "xrdbatch"
+version = "0.1.0"
+description = "Batch processing of X-ray diffraction patterns: background, peaks, d-spacing, FWHM, Scherrer size."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
