@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from xrdbatch.pattern import Pattern
+from xrdbatch.readers.bruker import read_brml
 from xrdbatch.readers.text import read_text
 
 TEXT_EXTENSIONS = {".xy", ".csv", ".txt", ".dat"}
@@ -16,6 +17,7 @@ class UnsupportedFormatError(ValueError):
 
 def _readers():
     readers = {ext: lambda p: [read_text(p)] for ext in TEXT_EXTENSIONS}
+    readers[".brml"] = read_brml
     return readers
 
 
