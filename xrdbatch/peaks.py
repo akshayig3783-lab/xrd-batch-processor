@@ -7,9 +7,10 @@ import pandas as pd
 from scipy.ndimage import median_filter
 from scipy.signal import find_peaks, peak_widths
 
+from xrdbatch.constants import KA_DOUBLETS, KA_MATCH_TOLERANCE
 from xrdbatch.pattern import Pattern
 
-COLUMNS = ["pattern", "two_theta", "d_spacing", "intensity", "rel_intensity", "fwhm", "crystallite_size_nm"]
+COLUMNS = ["pattern", "two_theta", "d_spacing", "intensity", "rel_intensity", "fwhm", "crystallite_size_nm", "ka2_shoulder"]
 
 
 def resolve_wavelength(p: Pattern, ui_wavelength: float) -> tuple[float, str]:
@@ -74,6 +75,29 @@ def _fwhm_at_half_height(tt: np.ndarray, y: np.ndarray, i: int) -> float:
     return float(np.interp(hi[0], positions, tt) - np.interp(lo[0], positions, tt))
 
 
+KA2_POSITION_TOLERANCE = 0.02  # degrees 2θ
+KA2_INTENSITY_RATIO = (0.25, 0.75)  # theoretical Kα2/Kα1 ≈ 0.5
+
+
+def flag_ka2_shoulders(two_theta: np.ndarray, intensity: np.ndarray, wavelength: float) -> np.ndarray:
+    """True for peaks sitting where the Kα2 line of a stronger peak is expected, at about half its height."""
+    flags = np.zeros(len(two_theta), dtype=bool)
+    doublet = next((d for d in KA_DOUBLETS.values() if min(abs(wavelength - w) for w in d) <= KA_MATCH_TOLERANCE), None)
+    if doublet is None or len(two_theta) < 2:
+        return flags
+    ka1, ka2 = doublet
+    for i, (tt1, i1) in enumerate(zip(two_theta, intensity)):
+        sin_ka2 = ka2 / ka1 * np.sin(np.radians(tt1 / 2))
+        if sin_ka2 >= 1:
+            continue
+        expected = 2 * np.degrees(np.arcsin(sin_ka2))
+        for j, (tt2, i2) in enumerate(zip(two_theta, intensity)):
+            ratio = i2 / i1 if i1 > 0 else 0
+            if j != i and abs(tt2 - expected) <= KA2_POSITION_TOLERANCE and KA2_INTENSITY_RATIO[0] <= ratio <= KA2_INTENSITY_RATIO[1]:
+                flags[j] = True
+    return flags
+
+
 def find_peaks_table(
     p: Pattern,
     wavelength: float,
@@ -107,6 +131,7 @@ def find_peaks_table(
             "rel_intensity": 100 * intensity / intensity.max(),
             "fwhm": fwhm,
             "crystallite_size_nm": scherrer_size_nm(fwhm, peak_tt, wavelength, k),
+            "ka2_shoulder": flag_ka2_shoulders(peak_tt, intensity, wavelength),
         }
     )
     return table[COLUMNS].sort_values("two_theta").reset_index(drop=True)

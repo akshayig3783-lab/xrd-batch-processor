@@ -25,7 +25,8 @@ def validate(name: str, n_peaks: int = 5):
     path = DATA / f"{name}.txt"
     pattern = read_pattern(path)[0]
     table = find_peaks_table(process(pattern, ProcessingSettings()), RRUFF_WAVELENGTH)
-    strongest = table.sort_values("intensity", ascending=False)["two_theta"].head(n_peaks)
+    main = table[~table["ka2_shoulder"].astype(bool)]  # Kα2 shoulders are flagged by the tool, not main lines
+    strongest = main.sort_values("intensity", ascending=False)["two_theta"].head(n_peaks)
     dif = DATA / f"{name}.dif"
     if dif.exists():
         reference = read_rruff_dif(dif)["two_theta"].tolist()
