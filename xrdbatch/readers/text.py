@@ -1,7 +1,8 @@
 """Reader for two-column text exports: .xy, .csv, .txt, .dat.
 
-Handles whitespace, comma and semicolon delimiters, German decimal commas
-(``28,44;1520``), header lines, and RRUFF ``##KEY=value`` headers.
+Handles whitespace, tab, comma and semicolon delimiters, German decimal commas
+(``28,44;1520``, ``28,44<TAB>1520``, ``28,44 1520``), header lines, and RRUFF
+``##KEY=value`` headers.
 """
 
 from __future__ import annotations
@@ -11,47 +12,61 @@ from pathlib import Path
 
 from xrdbatch.pattern import Pattern, clean
 
-_WAVELENGTH_RE = re.compile(r"WAVELENGTH\s*[=:]\s*([0-9]*\.?[0-9]+)", re.IGNORECASE)
+_WAVELENGTH_RE = re.compile(r"WAVE\s*LENGTH[^0-9=:]*[=:]?\s*([0-9]+(?:[.,][0-9]+)?)", re.IGNORECASE)
+_PLAUSIBLE_WAVELENGTH = (0.3, 3.0)  # Å; covers Ag, Mo, Cu, Co, Fe, Cr tubes
 
 
-def _split(line: str) -> list[str]:
+def _candidates(line: str):
+    """Ways to split one data line, most specific first."""
     if ";" in line:
-        return [part.replace(",", ".") for part in line.split(";")]
-    if "," in line:
-        parts = [part.strip() for part in line.split(",")]
-        if len(parts) >= 2:
-            return parts
+        yield [part.replace(",", ".") for part in line.split(";")]
     if "\t" in line:
-        return line.split("\t")
-    return line.split()
+        yield [part.replace(",", ".") for part in line.split("\t")]
+    if "," in line:
+        yield line.split(",")
+        yield [part.replace(",", ".") for part in line.split()]
+    yield line.split()
 
 
 def _parse_xy(line: str) -> tuple[float, float] | None:
-    parts = [p.strip() for p in _split(line) if p.strip()]
-    if len(parts) < 2:
+    for parts in _candidates(line):
+        parts = [p.strip() for p in parts if p.strip()]
+        if len(parts) < 2:
+            continue
+        try:
+            return float(parts[0]), float(parts[1])
+        except ValueError:
+            continue
+    return None
+
+
+def _wavelength(line: str, warnings: list[str]) -> float | None:
+    match = _WAVELENGTH_RE.search(line)
+    if not match:
         return None
-    try:
-        return float(parts[0]), float(parts[1])
-    except ValueError:
+    value = float(match.group(1).replace(",", "."))
+    lo, hi = _PLAUSIBLE_WAVELENGTH
+    if not lo <= value <= hi:
+        warnings.append(f"Ignored implausible wavelength {value} in header (expected {lo}–{hi} Å).")
         return None
+    return value
 
 
 def read_text(path) -> Pattern:
     path = Path(path)
-    text = path.read_text(encoding="utf-8", errors="replace")
+    text = path.read_text(encoding="utf-8-sig", errors="replace")
     tt, y = [], []
     wavelength = None
+    header_warnings: list[str] = []
     for raw in text.splitlines():
         line = raw.strip()
         if not line:
             continue
-        if line.startswith(("#", "!", "'")):
-            match = _WAVELENGTH_RE.search(line)
-            if match:
-                wavelength = float(match.group(1))
-            continue
-        xy = _parse_xy(line)
+        is_comment = line.startswith(("#", "!", "'"))
+        xy = None if is_comment else _parse_xy(line)
         if xy is None:
+            if wavelength is None:
+                wavelength = _wavelength(line, header_warnings)
             continue
         tt.append(xy[0])
         y.append(xy[1])
@@ -66,5 +81,5 @@ def read_text(path) -> Pattern:
         intensity=intensity,
         wavelength=wavelength,
         metadata={"source": path.name, "format": "text"},
-        warnings=warnings,
+        warnings=header_warnings + warnings,
     )

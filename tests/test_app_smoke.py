@@ -18,3 +18,18 @@ def test_app_starts_with_instructions():
     at = AppTest.from_file(APP, default_timeout=60).run()
     assert not at.exception
     assert any("Upload" in i.value or "demo" in i.value for i in at.info)
+
+
+def test_prepare_exports_and_duplicate_demo_load():
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at.button(key="demo").click().run()
+    at.button(key="prepare_exports").click().run()
+    assert not at.exception
+
+
+def test_crop_outside_all_data_does_not_crash():
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at.button(key="demo").click().run()
+    at.slider[0].set_value((150.0, 160.0)).run()
+    assert not at.exception
+    assert any("no data left" in w.value for w in at.warning)

@@ -42,3 +42,14 @@ def clean(two_theta, intensity) -> tuple[np.ndarray, np.ndarray, list[str]]:
         warnings.append(f"Averaged {tt.size - unique_tt.size} duplicate 2θ value(s).")
     sums = np.bincount(inverse, weights=y, minlength=unique_tt.size)
     return unique_tt, sums / counts, warnings
+
+
+def make_unique_names(patterns: list[Pattern]) -> list[Pattern]:
+    """Rename repeated names to "name (2)", "name (3)", … so results never overwrite each other."""
+    seen: dict[str, int] = {}
+    for p in patterns:
+        count = seen.get(p.name, 0) + 1
+        seen[p.name] = count
+        if count > 1:
+            p.name = f"{p.name} ({count})"
+    return patterns

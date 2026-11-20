@@ -86,7 +86,7 @@ def subtract_background(
 
 
 def normalise(p: Pattern, mode: Literal["max", "area", "none"] = "max") -> Pattern:
-    if mode == "none":
+    if mode == "none" or len(p.intensity) == 0:
         return _with(p)
     if mode == "max":
         scale = np.max(p.intensity)

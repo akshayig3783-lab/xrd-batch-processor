@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from scipy.ndimage import median_filter
 from scipy.signal import find_peaks, peak_widths
 
 from xrdbatch.pattern import Pattern
@@ -31,6 +32,48 @@ def scherrer_size_nm(fwhm_deg, two_theta_deg, wavelength, k: float = 0.9):
     return k * (wavelength / 10) / (beta * np.cos(theta))
 
 
+NOISE_FACTOR = 6.0  # a peak's prominence must exceed this many noise standard deviations
+
+
+def noise_sigma(y: np.ndarray, step: float) -> float:
+    """Robust noise level: MAD of the residual after a ~1° running median removes peaks and background."""
+    size = max(5, int(round(1.0 / step)) | 1)
+    residual = y - median_filter(y, size=size, mode="nearest")
+    return float(1.4826 * np.median(np.abs(residual - np.median(residual))))
+
+
+def _half_width(tt: np.ndarray, y: np.ndarray, i: int, half: float, direction: int) -> float | None:
+    """Distance in 2θ from peak i to where y falls below ``half``; None if a neighbouring peak rises first."""
+    j = i
+    while 0 <= j + direction < len(y):
+        k = j + direction
+        if y[k] < half:
+            # linear interpolation between j (above half) and k (below half)
+            x = tt[j] + (tt[k] - tt[j]) * (y[j] - half) / (y[j] - y[k])
+            return abs(x - tt[i])
+        if y[k] > y[j] and y[j] < y[i]:  # climbing into the next peak before reaching half height
+            return None
+        j = k
+    return None
+
+
+def _fwhm_at_half_height(tt: np.ndarray, y: np.ndarray, i: int) -> float:
+    """FWHM at half the peak's height above zero (data is background-subtracted).
+
+    When one side is blocked by an overlapping peak, assume symmetry and double the other side.
+    """
+    half = y[i] / 2
+    left = _half_width(tt, y, i, half, -1)
+    right = _half_width(tt, y, i, half, +1)
+    if left is not None and right is not None:
+        return left + right
+    if left is not None or right is not None:
+        return 2 * (left if left is not None else right)
+    _, _, lo, hi = peak_widths(y, [i], rel_height=0.5)
+    positions = np.arange(len(tt))
+    return float(np.interp(hi[0], positions, tt) - np.interp(lo[0], positions, tt))
+
+
 def find_peaks_table(
     p: Pattern,
     wavelength: float,
@@ -47,13 +90,12 @@ def find_peaks_table(
 
     step = float(np.median(np.diff(tt)))
     distance = max(1, int(round(min_distance_deg / step)))
-    idx, _ = find_peaks(y, prominence=prominence * peak_max, distance=distance)
+    threshold = max(prominence * peak_max, NOISE_FACTOR * noise_sigma(y, step))
+    idx, _ = find_peaks(y, prominence=threshold, distance=distance)
     if idx.size == 0:
         return pd.DataFrame(columns=COLUMNS)
 
-    _, _, left, right = peak_widths(y, idx, rel_height=0.5)
-    positions = np.arange(tt.size)
-    fwhm = np.interp(right, positions, tt) - np.interp(left, positions, tt)
+    fwhm = np.array([_fwhm_at_half_height(tt, y, i) for i in idx])
     peak_tt = tt[idx]
     intensity = y[idx]
     table = pd.DataFrame(
