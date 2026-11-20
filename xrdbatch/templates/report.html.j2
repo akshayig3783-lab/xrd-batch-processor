@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>XRD Batch Report</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  h1 { color: #1f4e79; }
+  img { max-width: 100%; }
+  table.peaks { border-collapse: collapse; font-size: 0.85rem; }
+  table.peaks th, table.peaks td { padding: 4px 8px; border-bottom: 1px solid #ddd; text-align: right; }
+  .caveat { background: #fff6e0; padding: 0.6rem 1rem; border-left: 4px solid #e0a800; }
+  .warn { color: #a04000; }
+  dl { display: grid; grid-template-columns: max-content auto; gap: 2px 12px; }
+</style>
+</head>
+<body>
+<h1>XRD Batch Report</h1>
+<p class="caveat">{{ caveat }}</p>
+
+<h2>Processing settings</h2>
+<dl>
+{% for key, value in settings.items() %}<dt>{{ key }}</dt><dd>{{ value }}</dd>
+{% endfor %}
+</dl>
+
+{% if overview %}
+<h2>Overview</h2>
+<img src="data:image/png;base64,{{ overview }}" alt="Stacked overview of all patterns">
+{% endif %}
+
+{% for s in sections %}
+<h2>{{ s.name }}</h2>
+<p>Wavelength: {{ s.wavelength }} Å ({{ s.source }})</p>
+{% for w in s.warnings %}<p class="warn">⚠ {{ w }}</p>{% endfor %}
+<img src="data:image/png;base64,{{ s.image }}" alt="Pattern {{ s.name }} with detected peaks">
+{{ s.table | safe }}
+{% endfor %}
+</body>
+</html>
