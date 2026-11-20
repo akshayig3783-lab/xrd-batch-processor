@@ -2,7 +2,7 @@
 
 **Turn a folder of X-ray diffraction scans into peak tables, d-spacings, FWHM and crystallite sizes in seconds — instead of an afternoon in EVA, Origin or Excel.**
 
-🔗 **Live demo:** _coming soon_ · ![tests](https://github.com/OWNER/xrd-batch-processor/actions/workflows/tests.yml/badge.svg)
+🔗 **Live demo:** _coming soon_ · ![tests](https://github.com/akshayig3783-lab/xrd-batch-processor/actions/workflows/tests.yml/badge.svg)
 
 <!-- docs/demo.gif goes here -->
 
@@ -22,7 +22,7 @@ Labs routinely measure dozens of samples — temperature series, composition ser
 
 ## Quick start
 ```bash
-git clone https://github.com/OWNER/xrd-batch-processor.git
+git clone https://github.com/akshayig3783-lab/xrd-batch-processor.git
 cd xrd-batch-processor
 python -m venv .venv
 .venv\Scripts\activate        # Windows  (macOS/Linux: source .venv/bin/activate)
