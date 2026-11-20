@@ -2,7 +2,7 @@
 
 **Turn a folder of X-ray diffraction scans into peak tables, d-spacings, FWHM and crystallite sizes in seconds — instead of an afternoon in EVA, Origin or Excel.**
 
-🔗 **Live demo:** _coming soon_ · ![tests](https://github.com/akshayig3783-lab/xrd-batch-processor/actions/workflows/tests.yml/badge.svg)
+🔗 **Live demo:** https://xrd-batch-analysis.streamlit.app · ![tests](https://github.com/akshayig3783-lab/xrd-batch-processor/actions/workflows/tests.yml/badge.svg)
 
 <!-- docs/demo.gif goes here -->
 
